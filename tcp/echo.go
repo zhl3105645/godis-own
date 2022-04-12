@@ -1,65 +1,82 @@
-package main
+package tcp
 
 import (
 	"bufio"
-	"fmt"
+	"context"
+	"godis/lib/logger"
+	"godis/lib/sync/atomic"
+	"godis/lib/sync/wait"
 	"io"
-	"log"
 	"net"
+	"sync"
+	"time"
 )
 
-func ListenAndServe(address string) {
-	// 绑定监听地址
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatal(fmt.Sprintf("listen err: %v", err))
-	}
-	defer func(listener net.Listener) {
-		err := listener.Close()
-		if err != nil {
-			log.Println("closing listener failed")
-		}
-	}(listener)
-	log.Println(fmt.Sprintf("bind: %s, starting listening...", address))
-
-	for {
-		// Accept 会一直阻塞直到有新的连接建立或者 listener 中断才会返回
-		conn, err := listener.Accept()
-		if err != nil {
-			// 通常是由于 listener 被关闭导致无法继续监听
-			log.Fatal(fmt.Sprintf("accept err: %v", err))
-		}
-		// 开启新的 goroutine 处理该连接
-		go Handle(conn)
-	}
+// EchoHandler echos received line to client, using for test
+type EchoHandler struct {
+	activeConn sync.Map
+	closing    atomic.Boolean
 }
 
-func Handle(conn net.Conn) {
-	// 使用 bufio 提供的缓冲区功能
+// MakeEchoHandler creates EchoHandler
+func MakeEchoHandler() *EchoHandler {
+	return &EchoHandler{}
+}
+
+// EchoClient is client for EchoHandler, using for test
+type EchoClient struct {
+	Conn    net.Conn
+	Waiting wait.Wait
+}
+
+// Close closes the connection
+func (c *EchoClient) Close() error {
+	// 10s 关闭直接返回
+	c.Waiting.WaitWithTimeout(10 * time.Second)
+	c.Conn.Close()
+	return nil
+}
+
+// Handle echos received line to client
+func (h *EchoHandler) Handle(ctx context.Context, conn net.Conn) {
+	if h.closing.Get() {
+		// closing handler refuses new connection
+		_ = conn.Close()
+	}
+
+	client := &EchoClient{
+		Conn: conn,
+	}
+	h.activeConn.Store(client, struct{}{})
+
 	reader := bufio.NewReader(conn)
 	for {
-		// ReadString 一直阻塞直到读到分隔符 '\n'
-		// 返回读到的数据，包括 分隔符
-		// 出现错误则只返回当前接收到的所有数据以及错误信息
+		// may occur: client EOF, client timeout, server early close
 		msg, err := reader.ReadString('\n')
 		if err != nil {
-			// 连接中断
 			if err == io.EOF {
-				log.Println("connection close")
+				logger.Info("connection close")
+				h.activeConn.Delete(client)
 			} else {
-				log.Println(err)
+				logger.Warn(err)
 			}
 			return
 		}
+		client.Waiting.Add(1)
 		b := []byte(msg)
-		// 将收到的信息发送给客户端
-		_, err = conn.Write(b)
-		if err != nil {
-			log.Println(fmt.Sprintf("writing to client failed, err := %v", err))
-		}
+		_, _ = conn.Write(b)
+		client.Waiting.Done()
 	}
 }
 
-func main() {
-	ListenAndServe(":8000")
+// Close stops the echo handler
+func (h *EchoHandler) Close() error {
+	logger.Info("handler shutting down...")
+	h.closing.Set(true)
+	h.activeConn.Range(func(key, value interface{}) bool {
+		client := key.(EchoClient)
+		_ = client.Close()
+		return true
+	})
+	return nil
 }
