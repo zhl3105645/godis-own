@@ -141,7 +141,7 @@ func (dict *ConcurrentDict) PutIfAbsent(key string, val interface{}) (result int
 	return 1
 }
 
-// PutIfExists puts value if the key is exist and returns the number of inserted key-value
+// PutIfExists puts value if the key exists and returns the number of inserted key-value
 func (dict *ConcurrentDict) PutIfExists(key string, val interface{}) (result int) {
 	if dict == nil {
 		panic("dict is nil")
