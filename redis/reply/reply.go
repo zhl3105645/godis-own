@@ -39,22 +39,22 @@ func (r *BulkReply) ToBytes() []byte {
 
 // MultiBulkReply stores a list of string
 type MultiBulkReply struct {
-	Arg [][]byte
+	Args [][]byte
 }
 
 // MakeMultiBulkReply creates MultiBulkReply
 func MakeMultiBulkReply(args [][]byte) *MultiBulkReply {
 	return &MultiBulkReply{
-		Arg: args,
+		Args: args,
 	}
 }
 
 // ToBytes marshal redis.Reply
 func (r *MultiBulkReply) ToBytes() []byte {
-	argLen := len(r.Arg)
+	argLen := len(r.Args)
 	var buf bytes.Buffer
 	buf.WriteString("*" + strconv.Itoa(argLen) + CRLF)
-	for _, arg := range r.Arg {
+	for _, arg := range r.Args {
 		if arg == nil {
 			buf.WriteString("$-1" + CRLF)
 		} else {
@@ -147,8 +147,8 @@ func MakeErrReply(status string) *StandardErrReply {
 	}
 }
 
-// isErrorReply returns true if the given reply is error
-func isErrorReply(reply redis.Reply) bool {
+// IsErrorReply returns true if the given reply is error
+func IsErrorReply(reply redis.Reply) bool {
 	return reply.ToBytes()[0] == '-'
 }
 
