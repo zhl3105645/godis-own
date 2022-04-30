@@ -1,5 +1,7 @@
 package utils
 
+import "os"
+
 // Equals check whether the given value is equal
 func Equals(a, b interface{}) bool {
 	sliceA, okA := a.([]byte)
@@ -25,4 +27,9 @@ func BytesEquals(a, b []byte) bool {
 		}
 	}
 	return true
+}
+
+func FileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	return err == nil && !info.IsDir()
 }
