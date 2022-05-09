@@ -189,6 +189,29 @@ func (list *LinkedList) RemoveByVal(val interface{}, count int) int {
 	return removed
 }
 
+// ReverseRemoveByVal removes at most `count` values of the specified value in this list
+// scan from right to left
+func (list *LinkedList) ReverseRemoveByVal(val interface{}, count int) int {
+	if list == nil {
+		panic("list is nil")
+	}
+	n := list.last
+	removed := 0
+	var prevNode *node
+	for n != nil {
+		prevNode = n.prev
+		if utils.Equals(n.val, val) {
+			list.removeNode(n)
+			removed++
+		}
+		if removed == count {
+			break
+		}
+		n = prevNode
+	}
+	return removed
+}
+
 // Len returns the number of elements in list
 func (list *LinkedList) Len() int {
 	if list == nil {

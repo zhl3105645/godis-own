@@ -4,6 +4,7 @@ import "strings"
 
 var cmdTable = make(map[string]*command)
 
+// command 命令
 type command struct {
 	executor ExecFunc
 	prepare  PreFunc // return related keys command

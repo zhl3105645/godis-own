@@ -7,6 +7,7 @@ package server
 import (
 	"context"
 	"godis/config"
+	database2 "godis/database"
 	"godis/interface/database"
 	"godis/lib/logger"
 	"godis/lib/sync/atomic"
@@ -36,7 +37,7 @@ func MakeHandler() *Handler {
 	if config.Properties.Self != "" && len(config.Properties.Peers) > 0 {
 		//TODO 集群
 	} else {
-		// TODO MultiDB
+		db = database2.NewStandaloneServer()
 	}
 	return &Handler{db: db}
 }
