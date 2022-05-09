@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"godis/config"
 	database2 "godis/database"
 	"godis/interface/database"
@@ -37,6 +38,7 @@ func MakeHandler() *Handler {
 	if config.Properties.Self != "" && len(config.Properties.Peers) > 0 {
 		//TODO 集群
 	} else {
+		logger.Info("multiDB created successfully")
 		db = database2.NewStandaloneServer()
 	}
 	return &Handler{db: db}
@@ -88,6 +90,7 @@ func (h *Handler) Handle(ctx context.Context, conn net.Conn) {
 			continue
 		}
 		result := h.db.Exec(client, r.Args)
+		logger.Info(fmt.Sprintf("result=%v", string(result.ToBytes())))
 		if result != nil {
 			_ = client.Write(result.ToBytes())
 		} else {

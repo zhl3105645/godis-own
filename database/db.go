@@ -102,7 +102,8 @@ func (db *DB) Exec(c redis.Connection, cmdLine [][]byte) redis.Reply {
 		return Watch(db, c, cmdLine[1:])
 	}
 	if c != nil && c.InMultiState() {
-
+		EnqueueCmd(c, cmdLine)
+		return reply.MakeQueuedReply()
 	}
 
 	return db.execNormalCommand(cmdLine)

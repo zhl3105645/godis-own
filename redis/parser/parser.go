@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"godis/interface/redis"
 	"godis/lib/logger"
 	"godis/redis/reply"
@@ -87,6 +88,7 @@ func parse0(reader io.Reader, ch chan<- *Payload) {
 		// read line
 		var ioErr bool
 		msg, ioErr, err = readLine(bufReader, &state)
+		logger.Info(fmt.Sprintf("msg read from reader. msg=%s, ioErr=%v, err=%v", string(msg), ioErr, err))
 		if err != nil {
 			// io err, stop read
 			if ioErr {
@@ -147,43 +149,43 @@ func parse0(reader io.Reader, ch chan<- *Payload) {
 					// reset state
 					state = readState{}
 					continue
-				} else {
-					// single line reply
-					result, err := parseSingleLineReply(msg)
-					ch <- &Payload{
-						Data: result,
-						Err:  err,
-					}
-					// reset state
-					state = readState{}
-					continue
 				}
 			} else {
-				// receive following bulk reply
-				err = readBody(msg, &state)
-				if err != nil {
-					ch <- &Payload{
-						Err: errors.New("protocol error: " + string(msg)),
-					}
-					// reset state
-					state = readState{}
-					continue
+				// single line reply
+				result, err := parseSingleLineReply(msg)
+				ch <- &Payload{
+					Data: result,
+					Err:  err,
 				}
-				// if sending finish
-				if state.finished() {
-					var result redis.Reply
-					if state.msgType == '*' {
-						result = reply.MakeMultiBulkReply(state.args)
-					} else if state.msgType == '$' {
-						result = reply.MakeBulkReply(state.args[0])
-					}
-					ch <- &Payload{
-						Data: result,
-						Err:  err,
-					}
-					// reset state
-					state = readState{}
+				// reset state
+				state = readState{}
+				continue
+			}
+		} else {
+			// receive following bulk reply
+			err = readBody(msg, &state)
+			if err != nil {
+				ch <- &Payload{
+					Err: errors.New("protocol error: " + string(msg)),
 				}
+				// reset state
+				state = readState{}
+				continue
+			}
+			// if sending finish
+			if state.finished() {
+				var result redis.Reply
+				if state.msgType == '*' {
+					result = reply.MakeMultiBulkReply(state.args)
+				} else if state.msgType == '$' {
+					result = reply.MakeBulkReply(state.args[0])
+				}
+				ch <- &Payload{
+					Data: result,
+					Err:  err,
+				}
+				// reset state
+				state = readState{}
 			}
 		}
 	}

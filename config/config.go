@@ -30,7 +30,7 @@ func init() {
 	// default config
 	Properties = &ServerProperties{
 		Bind:       "127.0.0.1",
-		Port:       6398,
+		Port:       6379,
 		AppendOnly: false,
 	}
 }
@@ -100,11 +100,11 @@ func SetupConfig(configFileName string) {
 	if err != nil {
 		panic(err)
 	}
-	defer func(file *os.File) {
+	defer func() {
 		err := file.Close()
 		if err != nil {
 			logger.Error(err.Error())
 		}
-	}(file)
+	}()
 	Properties = parse(file)
 }
