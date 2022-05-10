@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Setting stores the settings for logger
-type Setting struct {
+// Settings stores the settings for logger
+type Settings struct {
 	Path       string
 	Name       string
 	Ext        string
@@ -47,7 +47,7 @@ func init() {
 }
 
 // Setup initializes logger
-func Setup(setting *Setting) {
+func Setup(setting *Settings) {
 	var err error
 	dir := setting.Path
 	fileName := fmt.Sprintf("%s-%s.%s", setting.Name, time.Now().Format(setting.TimeFormat), setting.Ext)
@@ -111,6 +111,3 @@ func Fatal(v ...interface{}) {
 	setPrefix(FATAL)
 	logger.Fatalln(v...)
 }
-
-
-

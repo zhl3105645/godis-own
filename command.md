@@ -1,0 +1,107 @@
+# Supported Commands
+
+- Keys
+    - del 
+    - expire
+    - expireat
+    - pexpire
+    - pexpireat
+    - ttl
+    - pttl
+    - persist
+    - exists
+    - type
+    - rename
+    - renamenx
+- Server
+    - flushdb
+    - flushall
+    - keys
+    - select
+    - bgrewriteaof
+    - rewriteaof
+- String
+    - set
+    - setnx
+    - setex
+    - psetex
+    - mset
+    - mget
+    - msetnx
+    - get
+    - getset
+    - incr
+    - incrby
+    - incrbyfloat
+    - decr
+    - decrby
+    - append
+    - setrange
+    - getrange
+    - strlen
+- List
+    - lpush
+    - lpushx
+    - rpush
+    - rpushx
+    - lpop
+    - rpop
+    - rpoplpush
+    - lrem
+    - llen
+    - lindex
+    - lset
+    - lrange
+- Hash
+    - hset
+    - hsetnx
+    - hget
+    - hexists
+    - hdel
+    - hlen
+    - hmget
+    - hmset
+    - hkeys
+    - hvals
+    - hgetall
+    - hincrby
+    - hincrbyfloat
+- Set
+    - sadd
+    - sismember
+    - srem
+    - scard
+    - smembers
+    - sinter
+    - sinterstore
+    - sunion
+    - sunionstore
+    - sdiff
+    - sdiffstore
+    - srandmember
+- SortedSet
+    - zadd
+    - zscore
+    - zincrby
+    - zrank
+    - zcount
+    - zrevrank
+    - zcard
+    - zrange
+    - zrevrange
+    - zrangebyscore
+    - zrevrangebyscore
+    - zrem
+    - zremrangebyscore
+    - zremrangebyrank
+- Pub / Sub
+    - publish
+    - subscribe
+    - unsubscribe
+- Geo
+    - GeoAdd
+    - GeoPos
+    - GeoDist
+    - GeoHash
+    - GeoRadius
+    - GeoRadiusByMember

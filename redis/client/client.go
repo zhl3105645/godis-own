@@ -54,7 +54,7 @@ func MakeClient(addr string) (*Client, error) {
 }
 
 // Start starts asynchronous goroutines
-func (c *Client) start() {
+func (c *Client) Start() {
 	c.ticker = time.NewTicker(10 * time.Second)
 	go c.handleWrite()
 	go func() {

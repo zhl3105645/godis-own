@@ -57,7 +57,7 @@ func execLIndex(db *DB, args [][]byte) redis.Reply {
 		return &reply.NullBulkReply{}
 	}
 
-	size := list.Len() // assert: size > 0
+	size := list.Len() // asserts: size > 0
 	if index < -1*size {
 		return &reply.NullBulkReply{}
 	} else if index < 0 {
@@ -207,7 +207,7 @@ func execLRange(db *DB, args [][]byte) redis.Reply {
 	}
 
 	// compute index
-	size := list.Len() // assert: size > 0
+	size := list.Len() // asserts: size > 0
 	if start < -1*size {
 		start = 0
 	} else if start < 0 {
@@ -228,7 +228,7 @@ func execLRange(db *DB, args [][]byte) redis.Reply {
 		stop = start
 	}
 
-	// assert: start in [0, size - 1], stop in [start, size]
+	// asserts: start in [0, size - 1], stop in [start, size]
 	slice := list.Range(start, stop)
 	result := make([][]byte, len(slice))
 	for i, raw := range slice {
@@ -297,7 +297,7 @@ func execLSet(db *DB, args [][]byte) redis.Reply {
 		return reply.MakeErrReply("ERR no such key")
 	}
 
-	size := list.Len() // assert: size > 0
+	size := list.Len() // asserts: size > 0
 	if index < -1*size {
 		return reply.MakeErrReply("ERR index out of range")
 	} else if index < 0 {
@@ -325,7 +325,7 @@ func undoLSet(db *DB, args [][]byte) []CmdLine {
 	if list == nil {
 		return nil
 	}
-	size := list.Len() // assert: size > 0
+	size := list.Len() // asserts: size > 0
 	if index < -1*size {
 		return nil
 	} else if index < 0 {

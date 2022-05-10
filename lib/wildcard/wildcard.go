@@ -114,7 +114,7 @@ func (p *Pattern) IsMatch(s string) bool {
 	for j := 1; j < n+1; j++ {
 		table[0][j] = table[0][j-1] && p.items[j-1].typeCode == all
 	}
-	for i := 0; i < m+1; i++ {
+	for i := 1; i < m+1; i++ {
 		for j := 1; j < n+1; j++ {
 			if p.items[j-1].typeCode == all {
 				table[i][j] = table[i-1][j] || table[i][j-1]

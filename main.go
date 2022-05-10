@@ -27,7 +27,7 @@ var defaultProperties = &config.ServerProperties{
 
 func main() {
 	print(banner)
-	logger.Setup(&logger.Setting{
+	logger.Setup(&logger.Settings{
 		Path:       "logs",
 		Name:       "godis",
 		Ext:        "log",

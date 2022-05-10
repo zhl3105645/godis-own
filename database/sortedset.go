@@ -232,7 +232,7 @@ func range0(db *DB, key string, start int64, stop int64, withScores bool, desc b
 	}
 
 	// compute index
-	size := sortedSet.Len() // assert: size > 0
+	size := sortedSet.Len() // asserts: size > 0
 	if start < -1*size {
 		start = 0
 	} else if start < 0 {
@@ -253,7 +253,7 @@ func range0(db *DB, key string, start int64, stop int64, withScores bool, desc b
 		stop = start
 	}
 
-	// assert: start in [0, size - 1], stop in [start, size]
+	// asserts: start in [0, size - 1], stop in [start, size]
 	slice := sortedSet.Range(start, stop, desc)
 	if withScores {
 		result := make([][]byte, len(slice)*2)
@@ -486,7 +486,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 	}
 
 	// compute index
-	size := sortedSet.Len() // assert: size > 0
+	size := sortedSet.Len() // asserts: size > 0
 	if start < -1*size {
 		start = 0
 	} else if start < 0 {
@@ -507,7 +507,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 		stop = start
 	}
 
-	// assert: start in [0, size - 1], stop in [start, size]
+	// asserts: start in [0, size - 1], stop in [start, size]
 	removed := sortedSet.RemoveByRank(start, stop)
 	if removed > 0 {
 		db.addAof(utils.ToCmdLine3(constant.ZRemRangeByRank, args...))
