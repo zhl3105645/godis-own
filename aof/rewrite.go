@@ -6,7 +6,7 @@ import (
 	"godis/interface/database"
 	"godis/lib/logger"
 	"godis/lib/utils"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"io"
 	"io/ioutil"
 	"os"
@@ -54,7 +54,7 @@ func (h *Handler) DoRewrite(ctx *RewriteCtx) error {
 	// rewrite aof tmpFile
 	for i := 0; i < config.Properties.Databases; i++ {
 		// select db
-		data := reply.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(i))).ToBytes()
+		data := protocol.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(i))).ToBytes()
 		_, err := tmpFile.Write(data)
 		if err != nil {
 			return err
@@ -127,7 +127,7 @@ func (h *Handler) FinishRewrite(ctx *RewriteCtx) {
 	}
 
 	// sync tmpFile's db index with online aofFile
-	data := reply.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(ctx.dbIdx))).ToBytes()
+	data := protocol.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(ctx.dbIdx))).ToBytes()
 	_, err = tmpFile.Write(data)
 	if err != nil {
 		logger.Error("tmp file rewrite failed: " + err.Error())
@@ -153,7 +153,7 @@ func (h *Handler) FinishRewrite(ctx *RewriteCtx) {
 	h.aofFile = aofFile
 
 	// reset selected db 重新写入一次 select 指令保证 aof 中的数据库与 h.currentDB 一致
-	data = reply.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(h.currentDB))).ToBytes()
+	data = protocol.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(h.currentDB))).ToBytes()
 	_, err = h.aofFile.Write(data)
 	if err != nil {
 		panic(err)

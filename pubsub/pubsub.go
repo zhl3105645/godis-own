@@ -4,7 +4,7 @@ import (
 	"godis/constant"
 	"godis/dataStruct/list"
 	"godis/interface/redis"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"strconv"
 )
 
@@ -16,9 +16,9 @@ var (
 )
 
 func makeMsg(t string, channel string, code int64) []byte {
-	return []byte("*3\r\n$" + strconv.FormatInt(int64(len(t)), 10) + reply.CRLF + t + reply.CRLF +
-		"$" + strconv.FormatInt(int64(len(channel)), 10) + reply.CRLF + channel + reply.CRLF +
-		":" + strconv.FormatInt(code, 10) + reply.CRLF)
+	return []byte("*3\r\n$" + strconv.FormatInt(int64(len(t)), 10) + protocol.CRLF + t + protocol.CRLF +
+		"$" + strconv.FormatInt(int64(len(channel)), 10) + protocol.CRLF + channel + protocol.CRLF +
+		":" + strconv.FormatInt(code, 10) + protocol.CRLF)
 }
 
 func subscribe0(hub *Hub, channel string, client redis.Connection) bool {
@@ -73,7 +73,7 @@ func Subscribe(hub *Hub, c redis.Connection, args [][]byte) redis.Reply {
 			_ = c.Write(makeMsg(_subscribe, channel, int64(c.SubsCount())))
 		}
 	}
-	return &reply.NoReply{}
+	return &protocol.NoReply{}
 }
 
 // UnsubscribeAll removes the given connection from all subscribing channels
@@ -105,7 +105,7 @@ func UnSubscribe(db *Hub, c redis.Connection, args [][]byte) redis.Reply {
 
 	if len(channels) == 0 {
 		_ = c.Write(unSubscribeNothing)
-		return &reply.NoReply{}
+		return &protocol.NoReply{}
 	}
 
 	for _, channel := range channels {
@@ -113,13 +113,13 @@ func UnSubscribe(db *Hub, c redis.Connection, args [][]byte) redis.Reply {
 			_ = c.Write(makeMsg(_unsubscribe, channel, int64(c.SubsCount())))
 		}
 	}
-	return &reply.NoReply{}
+	return &protocol.NoReply{}
 }
 
 // Publish send msg to all subscribing client
 func Publish(hub *Hub, args [][]byte) redis.Reply {
 	if len(args) != 2 {
-		return &reply.ArgNumErrReply{Cmd: constant.Publish}
+		return &protocol.ArgNumErrReply{Cmd: constant.Publish}
 	}
 	channel := string(args[0])
 	message := args[1]
@@ -129,7 +129,7 @@ func Publish(hub *Hub, args [][]byte) redis.Reply {
 
 	raw, ok := hub.subs.Get(channel)
 	if !ok {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 	subscribers, _ := raw.(*list.LinkedList)
 	subscribers.ForEach(func(i int, c interface{}) bool {
@@ -138,8 +138,8 @@ func Publish(hub *Hub, args [][]byte) redis.Reply {
 		replyArgs[0] = messageBytes
 		replyArgs[1] = []byte(channel)
 		replyArgs[2] = message
-		_ = client.Write(reply.MakeMultiBulkReply(replyArgs).ToBytes())
+		_ = client.Write(protocol.MakeMultiBulkReply(replyArgs).ToBytes())
 		return true
 	})
-	return reply.MakeIntReply(int64(subscribers.Len()))
+	return protocol.MakeIntReply(int64(subscribers.Len()))
 }

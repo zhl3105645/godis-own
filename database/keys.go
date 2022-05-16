@@ -10,7 +10,7 @@ import (
 	"godis/interface/redis"
 	"godis/lib/utils"
 	"godis/lib/wildcard"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"strconv"
 	"time"
 )
@@ -43,7 +43,7 @@ func execDel(db *DB, args [][]byte) redis.Reply {
 	if deleted > 0 {
 		db.addAof(utils.ToCmdLine3(constant.Del, args...))
 	}
-	return reply.MakeIntReply(int64(deleted))
+	return protocol.MakeIntReply(int64(deleted))
 }
 
 func undoDel(db *DB, args [][]byte) []CmdLine {
@@ -64,14 +64,14 @@ func execExists(db *DB, args [][]byte) redis.Reply {
 			result++
 		}
 	}
-	return reply.MakeIntReply(result)
+	return protocol.MakeIntReply(result)
 }
 
 // execFlushDB removes all keys from current db
 func execFlushDB(db *DB, args [][]byte) redis.Reply {
 	db.Flush()
 	db.addAof(utils.ToCmdLine3(constant.FlushDb, args...))
-	return &reply.OkReply{}
+	return &protocol.OkReply{}
 }
 
 // execType returns the type of entity, include string, list, hash, set, and zset
@@ -79,21 +79,21 @@ func execType(db *DB, args [][]byte) redis.Reply {
 	key := string(args[0])
 	entity, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeStatusReply("none")
+		return protocol.MakeStatusReply("none")
 	}
 	switch entity.Data.(type) {
 	case []byte:
-		return reply.MakeStatusReply("string")
+		return protocol.MakeStatusReply("string")
 	case *list.LinkedList:
-		return reply.MakeStatusReply("list")
+		return protocol.MakeStatusReply("list")
 	case dict.Dict:
-		return reply.MakeStatusReply("hash")
+		return protocol.MakeStatusReply("hash")
 	case *set.Set:
-		return reply.MakeStatusReply("set")
+		return protocol.MakeStatusReply("set")
 	case *sortedset.SortedSet:
-		return reply.MakeStatusReply("zset")
+		return protocol.MakeStatusReply("zset")
 	default:
-		return &reply.UnknownErrReply{}
+		return &protocol.UnknownErrReply{}
 	}
 }
 
@@ -107,14 +107,14 @@ func prepareRename(args [][]byte) ([]string, []string) {
 // execRename a key
 func execRename(db *DB, args [][]byte) redis.Reply {
 	if len(args) != 2 {
-		return reply.MakeErrReply("ERR wrong number of arguments for `rename` command")
+		return protocol.MakeErrReply("ERR wrong number of arguments for `rename` command")
 	}
 	src := string(args[0])
 	dest := string(args[1])
 
 	entity, ok := db.GetEntity(src)
 	if !ok {
-		return reply.MakeErrReply("no such key")
+		return protocol.MakeErrReply("no such key")
 	}
 	rawTTL, hasTTL := db.ttlMap.Get(src)
 	db.PutEntity(dest, entity)
@@ -127,7 +127,7 @@ func execRename(db *DB, args [][]byte) redis.Reply {
 		db.Expire(dest, expireTime)
 	}
 	db.addAof(utils.ToCmdLine3(constant.Rename, args...))
-	return &reply.OkReply{}
+	return &protocol.OkReply{}
 }
 
 func undoRename(db *DB, args [][]byte) []CmdLine {
@@ -142,12 +142,12 @@ func execRenameNx(db *DB, args [][]byte) redis.Reply {
 
 	_, ok := db.GetEntity(dest)
 	if ok {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	entity, ok := db.GetEntity(src)
 	if !ok {
-		return reply.MakeErrReply("no such key")
+		return protocol.MakeErrReply("no such key")
 	}
 	rawTTL, hasTTL := db.ttlMap.Get(src)
 	db.Removes(src, dest) // clean src and dest with their ttl
@@ -159,7 +159,7 @@ func execRenameNx(db *DB, args [][]byte) redis.Reply {
 		db.Expire(dest, expireTime)
 	}
 	db.addAof(utils.ToCmdLine3(constant.RenameNx, args...))
-	return reply.MakeIntReply(1)
+	return protocol.MakeIntReply(1)
 }
 
 // execExpire sets a key's time to live in seconds
@@ -168,19 +168,19 @@ func execExpire(db *DB, args [][]byte) redis.Reply {
 
 	ttlArg, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	ttl := time.Duration(ttlArg) * time.Second
 
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	expireAt := time.Now().Add(ttl)
 	db.Expire(key, expireAt)
 	db.addAof(aof.MakeExpireCmd(key, expireAt).Args)
-	return reply.MakeIntReply(1)
+	return protocol.MakeIntReply(1)
 }
 
 // execExpireAt sets a key's expiration in unix timestamp
@@ -189,18 +189,18 @@ func execExpireAt(db *DB, args [][]byte) redis.Reply {
 
 	raw, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	expireAt := time.Unix(raw, 0)
 
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	db.Expire(key, expireAt)
 	db.addAof(aof.MakeExpireCmd(key, expireAt).Args)
-	return reply.MakeIntReply(1)
+	return protocol.MakeIntReply(1)
 }
 
 // execPExpire sets a key's time to live in milliseconds
@@ -209,19 +209,19 @@ func execPExpire(db *DB, args [][]byte) redis.Reply {
 
 	ttlArg, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	ttl := time.Duration(ttlArg) * time.Millisecond
 
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	expireAt := time.Now().Add(ttl)
 	db.Expire(key, expireAt)
 	db.addAof(aof.MakeExpireCmd(key, expireAt).Args)
-	return reply.MakeIntReply(1)
+	return protocol.MakeIntReply(1)
 }
 
 func execPExpireAt(db *DB, args [][]byte) redis.Reply {
@@ -229,68 +229,68 @@ func execPExpireAt(db *DB, args [][]byte) redis.Reply {
 
 	raw, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	expireAt := time.Unix(0, raw*int64(time.Millisecond))
 
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	db.Expire(key, expireAt)
 
 	db.addAof(aof.MakeExpireCmd(key, expireAt).Args)
-	return reply.MakeIntReply(1)
+	return protocol.MakeIntReply(1)
 }
 
 func execTTL(db *DB, args [][]byte) redis.Reply {
 	key := string(args[0])
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(-2)
+		return protocol.MakeIntReply(-2)
 	}
 
 	raw, exists := db.ttlMap.Get(key)
 	if !exists {
-		return reply.MakeIntReply(-1)
+		return protocol.MakeIntReply(-1)
 	}
 	expireTime, _ := raw.(time.Time)
 	ttl := expireTime.Sub(time.Now())
-	return reply.MakeIntReply(int64(ttl / time.Second))
+	return protocol.MakeIntReply(int64(ttl / time.Second))
 }
 
 func execPTTL(db *DB, args [][]byte) redis.Reply {
 	key := string(args[0])
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(-2)
+		return protocol.MakeIntReply(-2)
 	}
 
 	raw, exists := db.ttlMap.Get(key)
 	if !exists {
-		return reply.MakeIntReply(-1)
+		return protocol.MakeIntReply(-1)
 	}
 	expireTime, _ := raw.(time.Time)
 	ttl := expireTime.Sub(time.Now())
-	return reply.MakeIntReply(int64(ttl / time.Millisecond))
+	return protocol.MakeIntReply(int64(ttl / time.Millisecond))
 }
 
 func execPersist(db *DB, args [][]byte) redis.Reply {
 	key := string(args[0])
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	_, exists = db.ttlMap.Get(key)
 	if !exists {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	db.Persist(key)
 	db.addAof(utils.ToCmdLine3(constant.Persist, args...))
-	return reply.MakeIntReply(1)
+	return protocol.MakeIntReply(1)
 }
 
 func execKeys(db *DB, args [][]byte) redis.Reply {
@@ -302,18 +302,18 @@ func execKeys(db *DB, args [][]byte) redis.Reply {
 		}
 		return true
 	})
-	return reply.MakeMultiBulkReply(result)
+	return protocol.MakeMultiBulkReply(result)
 }
 
-func toTTLCmd(db *DB, key string) *reply.MultiBulkReply {
+func toTTLCmd(db *DB, key string) *protocol.MultiBulkReply {
 	raw, exists := db.ttlMap.Get(key)
 	if !exists {
 		// 无 TTL
-		return reply.MakeMultiBulkReply(utils.ToCmdLine(constant.Persist, key))
+		return protocol.MakeMultiBulkReply(utils.ToCmdLine(constant.Persist, key))
 	}
 	expireTime, _ := raw.(time.Time)
 	timestamp := strconv.FormatInt(expireTime.UnixNano()/1000/1000, 10)
-	return reply.MakeMultiBulkReply(utils.ToCmdLine(constant.PExpireAt, key, timestamp))
+	return protocol.MakeMultiBulkReply(utils.ToCmdLine(constant.PExpireAt, key, timestamp))
 }
 
 func undoExpire(db *DB, args [][]byte) []CmdLine {

@@ -6,24 +6,24 @@ import (
 	"godis/interface/database"
 	"godis/interface/redis"
 	"godis/lib/utils"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"strconv"
 	"strings"
 )
 
-func (db *DB) getAsSortedSet(key string) (*SortedSet.SortedSet, reply.ErrorReply) {
+func (db *DB) getAsSortedSet(key string) (*SortedSet.SortedSet, protocol.ErrorReply) {
 	entity, exists := db.GetEntity(key)
 	if !exists {
 		return nil, nil
 	}
 	sortedSet, ok := entity.Data.(*SortedSet.SortedSet)
 	if !ok {
-		return nil, &reply.WrongTypeErrReply{}
+		return nil, &protocol.WrongTypeErrReply{}
 	}
 	return sortedSet, nil
 }
 
-func (db *DB) getOrInitSortedSet(key string) (sortedSet *SortedSet.SortedSet, inited bool, errReply reply.ErrorReply) {
+func (db *DB) getOrInitSortedSet(key string) (sortedSet *SortedSet.SortedSet, inited bool, errReply protocol.ErrorReply) {
 	sortedSet, errReply = db.getAsSortedSet(key)
 	if errReply != nil {
 		return nil, false, errReply
@@ -42,7 +42,7 @@ func (db *DB) getOrInitSortedSet(key string) (sortedSet *SortedSet.SortedSet, in
 // execZAdd adds member into sorted set
 func execZAdd(db *DB, args [][]byte) redis.Reply {
 	if len(args)%2 != 1 {
-		return reply.MakeSyntaxErrReply()
+		return protocol.MakeSyntaxErrReply()
 	}
 	key := string(args[0])
 	size := (len(args) - 1) / 2
@@ -52,7 +52,7 @@ func execZAdd(db *DB, args [][]byte) redis.Reply {
 		member := string(args[2*i+2])
 		score, err := strconv.ParseFloat(string(scoreValue), 64)
 		if err != nil {
-			return reply.MakeErrReply("ERR value is not a valid float")
+			return protocol.MakeErrReply("ERR value is not a valid float")
 		}
 		elements[i] = &SortedSet.Element{
 			Member: member,
@@ -75,7 +75,7 @@ func execZAdd(db *DB, args [][]byte) redis.Reply {
 
 	db.addAof(utils.ToCmdLine3(constant.ZAdd, args...))
 
-	return reply.MakeIntReply(int64(i))
+	return protocol.MakeIntReply(int64(i))
 }
 
 func undoZAdd(db *DB, args [][]byte) []CmdLine {
@@ -99,15 +99,15 @@ func execZScore(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return &reply.NullBulkReply{}
+		return &protocol.NullBulkReply{}
 	}
 
 	element, exists := sortedSet.Get(member)
 	if !exists {
-		return &reply.NullBulkReply{}
+		return &protocol.NullBulkReply{}
 	}
 	value := strconv.FormatFloat(element.Score, 'f', -1, 64)
-	return reply.MakeBulkReply([]byte(value))
+	return protocol.MakeBulkReply([]byte(value))
 }
 
 // execZRank gets index of a member in sortedset, ascending order, start from 0
@@ -122,14 +122,14 @@ func execZRank(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return &reply.NullBulkReply{}
+		return &protocol.NullBulkReply{}
 	}
 
 	rank := sortedSet.GetRank(member, false)
 	if rank < 0 {
-		return &reply.NullBulkReply{}
+		return &protocol.NullBulkReply{}
 	}
-	return reply.MakeIntReply(rank)
+	return protocol.MakeIntReply(rank)
 }
 
 // execZRevRank gets index of a member in sortedset, descending order, start from 0
@@ -144,14 +144,14 @@ func execZRevRank(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return &reply.NullBulkReply{}
+		return &protocol.NullBulkReply{}
 	}
 
 	rank := sortedSet.GetRank(member, true)
 	if rank < 0 {
-		return &reply.NullBulkReply{}
+		return &protocol.NullBulkReply{}
 	}
-	return reply.MakeIntReply(rank)
+	return protocol.MakeIntReply(rank)
 }
 
 // execZCard gets number of members in sortedset
@@ -165,33 +165,33 @@ func execZCard(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
-	return reply.MakeIntReply(sortedSet.Len())
+	return protocol.MakeIntReply(sortedSet.Len())
 }
 
 // execZRange gets members in range, sort by score in ascending order
 func execZRange(db *DB, args [][]byte) redis.Reply {
 	// parse args
 	if len(args) != 3 && len(args) != 4 {
-		return reply.MakeErrReply("ERR wrong number of arguments for 'zrange' command")
+		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrange' command")
 	}
 	withScores := false
 	if len(args) == 4 {
 		if strings.ToUpper(string(args[3])) != "WITHSCORES" {
-			return reply.MakeErrReply("syntax error")
+			return protocol.MakeErrReply("syntax error")
 		}
 		withScores = true
 	}
 	key := string(args[0])
 	start, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	stop, err := strconv.ParseInt(string(args[2]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	return range0(db, key, start, stop, withScores, false)
 }
@@ -200,23 +200,23 @@ func execZRange(db *DB, args [][]byte) redis.Reply {
 func execZRevRange(db *DB, args [][]byte) redis.Reply {
 	// parse args
 	if len(args) != 3 && len(args) != 4 {
-		return reply.MakeErrReply("ERR wrong number of arguments for 'zrevrange' command")
+		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrevrange' command")
 	}
 	withScores := false
 	if len(args) == 4 {
 		if string(args[3]) != "WITHSCORES" {
-			return reply.MakeErrReply("syntax error")
+			return protocol.MakeErrReply("syntax error")
 		}
 		withScores = true
 	}
 	key := string(args[0])
 	start, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	stop, err := strconv.ParseInt(string(args[2]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	return range0(db, key, start, stop, withScores, true)
 }
@@ -228,7 +228,7 @@ func range0(db *DB, key string, start int64, stop int64, withScores bool, desc b
 		return errReply
 	}
 	if sortedSet == nil {
-		return &reply.EmptyMultiBulkReply{}
+		return &protocol.EmptyMultiBulkReply{}
 	}
 
 	// compute index
@@ -238,7 +238,7 @@ func range0(db *DB, key string, start int64, stop int64, withScores bool, desc b
 	} else if start < 0 {
 		start = size + start
 	} else if start >= size {
-		return &reply.EmptyMultiBulkReply{}
+		return &protocol.EmptyMultiBulkReply{}
 	}
 	if stop < -1*size {
 		stop = 0
@@ -265,7 +265,7 @@ func range0(db *DB, key string, start int64, stop int64, withScores bool, desc b
 			result[i] = []byte(scoreStr)
 			i++
 		}
-		return reply.MakeMultiBulkReply(result)
+		return protocol.MakeMultiBulkReply(result)
 	}
 	result := make([][]byte, len(slice))
 	i := 0
@@ -273,7 +273,7 @@ func range0(db *DB, key string, start int64, stop int64, withScores bool, desc b
 		result[i] = []byte(element.Member)
 		i++
 	}
-	return reply.MakeMultiBulkReply(result)
+	return protocol.MakeMultiBulkReply(result)
 }
 
 // execZCount gets number of members which score within given range
@@ -282,12 +282,12 @@ func execZCount(db *DB, args [][]byte) redis.Reply {
 
 	min, err := SortedSet.ParseScoreBorder(string(args[1]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	max, err := SortedSet.ParseScoreBorder(string(args[2]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	// get data
@@ -296,10 +296,10 @@ func execZCount(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
-	return reply.MakeIntReply(sortedSet.Count(min, max))
+	return protocol.MakeIntReply(sortedSet.Count(min, max))
 }
 
 /*
@@ -312,7 +312,7 @@ func rangeByScore0(db *DB, key string, min *SortedSet.ScoreBorder, max *SortedSe
 		return errReply
 	}
 	if sortedSet == nil {
-		return &reply.EmptyMultiBulkReply{}
+		return &protocol.EmptyMultiBulkReply{}
 	}
 
 	slice := sortedSet.RangeByScore(min, max, offset, limit, desc)
@@ -326,7 +326,7 @@ func rangeByScore0(db *DB, key string, min *SortedSet.ScoreBorder, max *SortedSe
 			result[i] = []byte(scoreStr)
 			i++
 		}
-		return reply.MakeMultiBulkReply(result)
+		return protocol.MakeMultiBulkReply(result)
 	}
 	result := make([][]byte, len(slice))
 	i := 0
@@ -334,24 +334,24 @@ func rangeByScore0(db *DB, key string, min *SortedSet.ScoreBorder, max *SortedSe
 		result[i] = []byte(element.Member)
 		i++
 	}
-	return reply.MakeMultiBulkReply(result)
+	return protocol.MakeMultiBulkReply(result)
 }
 
 // execZRangeByScore gets members which score within given range, in ascending order
 func execZRangeByScore(db *DB, args [][]byte) redis.Reply {
 	if len(args) < 3 {
-		return reply.MakeErrReply("ERR wrong number of arguments for 'zrangebyscore' command")
+		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrangebyscore' command")
 	}
 	key := string(args[0])
 
 	min, err := SortedSet.ParseScoreBorder(string(args[1]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	max, err := SortedSet.ParseScoreBorder(string(args[2]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	withScores := false
@@ -365,19 +365,19 @@ func execZRangeByScore(db *DB, args [][]byte) redis.Reply {
 				i++
 			} else if strings.ToUpper(s) == "LIMIT" {
 				if len(args) < i+3 {
-					return reply.MakeErrReply("ERR syntax error")
+					return protocol.MakeErrReply("ERR syntax error")
 				}
 				offset, err = strconv.ParseInt(string(args[i+1]), 10, 64)
 				if err != nil {
-					return reply.MakeErrReply("ERR value is not an integer or out of range")
+					return protocol.MakeErrReply("ERR value is not an integer or out of range")
 				}
 				limit, err = strconv.ParseInt(string(args[i+2]), 10, 64)
 				if err != nil {
-					return reply.MakeErrReply("ERR value is not an integer or out of range")
+					return protocol.MakeErrReply("ERR value is not an integer or out of range")
 				}
 				i += 3
 			} else {
-				return reply.MakeErrReply("ERR syntax error")
+				return protocol.MakeErrReply("ERR syntax error")
 			}
 		}
 	}
@@ -387,18 +387,18 @@ func execZRangeByScore(db *DB, args [][]byte) redis.Reply {
 // execZRevRangeByScore gets number of members which score within given range, in descending order
 func execZRevRangeByScore(db *DB, args [][]byte) redis.Reply {
 	if len(args) < 3 {
-		return reply.MakeErrReply("ERR wrong number of arguments for 'zrangebyscore' command")
+		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrangebyscore' command")
 	}
 	key := string(args[0])
 
 	min, err := SortedSet.ParseScoreBorder(string(args[2]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	max, err := SortedSet.ParseScoreBorder(string(args[1]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	withScores := false
@@ -412,19 +412,19 @@ func execZRevRangeByScore(db *DB, args [][]byte) redis.Reply {
 				i++
 			} else if strings.ToUpper(s) == "LIMIT" {
 				if len(args) < i+3 {
-					return reply.MakeErrReply("ERR syntax error")
+					return protocol.MakeErrReply("ERR syntax error")
 				}
 				offset, err = strconv.ParseInt(string(args[i+1]), 10, 64)
 				if err != nil {
-					return reply.MakeErrReply("ERR value is not an integer or out of range")
+					return protocol.MakeErrReply("ERR value is not an integer or out of range")
 				}
 				limit, err = strconv.ParseInt(string(args[i+2]), 10, 64)
 				if err != nil {
-					return reply.MakeErrReply("ERR value is not an integer or out of range")
+					return protocol.MakeErrReply("ERR value is not an integer or out of range")
 				}
 				i += 3
 			} else {
-				return reply.MakeErrReply("ERR syntax error")
+				return protocol.MakeErrReply("ERR syntax error")
 			}
 		}
 	}
@@ -434,18 +434,18 @@ func execZRevRangeByScore(db *DB, args [][]byte) redis.Reply {
 // execZRemRangeByScore removes members which score within given range
 func execZRemRangeByScore(db *DB, args [][]byte) redis.Reply {
 	if len(args) != 3 {
-		return reply.MakeErrReply("ERR wrong number of arguments for 'zremrangebyscore' command")
+		return protocol.MakeErrReply("ERR wrong number of arguments for 'zremrangebyscore' command")
 	}
 	key := string(args[0])
 
 	min, err := SortedSet.ParseScoreBorder(string(args[1]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	max, err := SortedSet.ParseScoreBorder(string(args[2]))
 	if err != nil {
-		return reply.MakeErrReply(err.Error())
+		return protocol.MakeErrReply(err.Error())
 	}
 
 	// get data
@@ -454,14 +454,14 @@ func execZRemRangeByScore(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return &reply.EmptyMultiBulkReply{}
+		return &protocol.EmptyMultiBulkReply{}
 	}
 
 	removed := sortedSet.RemoveByScore(min, max)
 	if removed > 0 {
 		db.addAof(utils.ToCmdLine3(constant.ZRemRangeByScore, args...))
 	}
-	return reply.MakeIntReply(removed)
+	return protocol.MakeIntReply(removed)
 }
 
 // execZRemRangeByRank removes members within given indexes
@@ -469,11 +469,11 @@ func execZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 	key := string(args[0])
 	start, err := strconv.ParseInt(string(args[1]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 	stop, err := strconv.ParseInt(string(args[2]), 10, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not an integer or out of range")
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
 	}
 
 	// get data
@@ -482,7 +482,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	// compute index
@@ -492,7 +492,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 	} else if start < 0 {
 		start = size + start
 	} else if start >= size {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 	if stop < -1*size {
 		stop = 0
@@ -512,7 +512,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 	if removed > 0 {
 		db.addAof(utils.ToCmdLine3(constant.ZRemRangeByRank, args...))
 	}
-	return reply.MakeIntReply(removed)
+	return protocol.MakeIntReply(removed)
 }
 
 // execZRem removes given members
@@ -531,7 +531,7 @@ func execZRem(db *DB, args [][]byte) redis.Reply {
 		return errReply
 	}
 	if sortedSet == nil {
-		return reply.MakeIntReply(0)
+		return protocol.MakeIntReply(0)
 	}
 
 	var deleted int64 = 0
@@ -543,7 +543,7 @@ func execZRem(db *DB, args [][]byte) redis.Reply {
 	if deleted > 0 {
 		db.addAof(utils.ToCmdLine3(constant.ZRem, args...))
 	}
-	return reply.MakeIntReply(deleted)
+	return protocol.MakeIntReply(deleted)
 }
 
 func undoZRem(db *DB, args [][]byte) []CmdLine {
@@ -563,7 +563,7 @@ func execZIncrBy(db *DB, args [][]byte) redis.Reply {
 	field := string(args[2])
 	delta, err := strconv.ParseFloat(rawDelta, 64)
 	if err != nil {
-		return reply.MakeErrReply("ERR value is not a valid float")
+		return protocol.MakeErrReply("ERR value is not a valid float")
 	}
 
 	// get or init entity
@@ -576,13 +576,13 @@ func execZIncrBy(db *DB, args [][]byte) redis.Reply {
 	if !exists {
 		sortedSet.Add(field, delta)
 		db.addAof(utils.ToCmdLine3(constant.ZIncrBy, args...))
-		return reply.MakeBulkReply(args[1])
+		return protocol.MakeBulkReply(args[1])
 	}
 	score := element.Score + delta
 	sortedSet.Add(field, score)
 	bytes := []byte(strconv.FormatFloat(score, 'f', -1, 64))
 	db.addAof(utils.ToCmdLine3(constant.ZIncrBy, args...))
-	return reply.MakeBulkReply(bytes)
+	return protocol.MakeBulkReply(bytes)
 }
 
 func undoZIncr(db *DB, args [][]byte) []CmdLine {

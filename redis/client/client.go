@@ -5,7 +5,7 @@ import (
 	"godis/lib/logger"
 	"godis/lib/sync/wait"
 	"godis/redis/parser"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -92,10 +92,10 @@ func (c *Client) Send(args [][]byte) redis.Reply {
 	c.pendingReqs <- request
 	timeout := request.waiting.WaitWithTimeout(maxWait)
 	if timeout {
-		return reply.MakeErrReply("server time out")
+		return protocol.MakeErrReply("server time out")
 	}
 	if request.err != nil {
-		return reply.MakeErrReply("request failed")
+		return protocol.MakeErrReply("request failed")
 	}
 	return request.reply
 }
@@ -129,7 +129,7 @@ func (c *Client) doRequest(req *request) {
 	if req == nil || len(req.args) == 0 {
 		return
 	}
-	re := reply.MakeMultiBulkReply(req.args)
+	re := protocol.MakeMultiBulkReply(req.args)
 	bytes := re.ToBytes()
 	_, err := c.conn.Write(bytes)
 	i := 0
@@ -183,7 +183,7 @@ func (c *Client) handleRead() error {
 	ch := parser.ParseStream(c.conn)
 	for payload := range ch {
 		if payload.Err != nil {
-			c.finishRequest(reply.MakeErrReply(payload.Err.Error()))
+			c.finishRequest(protocol.MakeErrReply(payload.Err.Error()))
 			continue
 		}
 		c.finishRequest(payload.Data)

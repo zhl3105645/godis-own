@@ -5,7 +5,7 @@ import (
 	"godis/pubsub"
 	"godis/redis/connection"
 	"godis/redis/parser"
-	"godis/redis/reply/asserts"
+	"godis/redis/protocol/asserts"
 	"testing"
 )
 

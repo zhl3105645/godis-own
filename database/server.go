@@ -10,7 +10,7 @@ import (
 	"godis/lib/logger"
 	"godis/lib/utils"
 	"godis/pubsub"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -73,7 +73,7 @@ func (m *MultiDB) Exec(c redis.Connection, cmdLine [][]byte) (result redis.Reply
 	defer func() {
 		if err := recover(); err != nil {
 			logger.Warn(fmt.Sprintf("error occurs: %v\n%s", err, string(debug.Stack())))
-			result = &reply.UnknownErrReply{}
+			result = &protocol.UnknownErrReply{}
 		}
 	}()
 
@@ -83,13 +83,13 @@ func (m *MultiDB) Exec(c redis.Connection, cmdLine [][]byte) (result redis.Reply
 		return Auth(c, cmdLine[1:])
 	}
 	if !isAuthenticated(c) {
-		return reply.MakeErrReply("NOAUTH Authentication required")
+		return protocol.MakeErrReply("NOAUTH Authentication required")
 	}
 
 	// special commands
 	if cmdName == constant.Subscribe {
 		if len(cmdLine) < 2 {
-			return reply.MakeArgNumErrReply(constant.Subscribe)
+			return protocol.MakeArgNumErrReply(constant.Subscribe)
 		}
 		return pubsub.Subscribe(m.hub, c, cmdLine[1:])
 	} else if cmdName == constant.Publish {
@@ -105,10 +105,10 @@ func (m *MultiDB) Exec(c redis.Connection, cmdLine [][]byte) (result redis.Reply
 		return m.flushAll()
 	} else if cmdName == constant.Select {
 		if c != nil && c.InMultiState() {
-			return reply.MakeErrReply("cannot select database within multi")
+			return protocol.MakeErrReply("cannot select database within multi")
 		}
 		if len(cmdLine) != 2 {
-			return reply.MakeArgNumErrReply(constant.Select)
+			return protocol.MakeArgNumErrReply(constant.Select)
 		}
 		return execSelect(c, m, cmdLine[1:])
 	}
@@ -117,7 +117,7 @@ func (m *MultiDB) Exec(c redis.Connection, cmdLine [][]byte) (result redis.Reply
 	// normal command
 	dbIndex := c.GetDBIndex()
 	if dbIndex >= len(m.dbSet) {
-		return reply.MakeErrReply("ERR DB index is out of range")
+		return protocol.MakeErrReply("ERR DB index is out of range")
 	}
 	selectedDB := m.dbSet[dbIndex]
 	return selectedDB.Exec(c, cmdLine)
@@ -147,7 +147,7 @@ func (m *MultiDB) ExecWithLock(conn redis.Connection, cmdLine [][]byte) redis.Re
 // ExecMulti executes multi commands transaction Atomically and Isolated
 func (m *MultiDB) ExecMulti(conn redis.Connection, watching map[string]uint32, cmdLines []database.CmdLine) redis.Reply {
 	if conn.GetDBIndex() >= len(m.dbSet) {
-		return reply.MakeErrReply("ERR DB index is out of range")
+		return protocol.MakeErrReply("ERR DB index is out of range")
 	}
 	db := m.dbSet[conn.GetDBIndex()]
 	return db.ExecMulti(conn, watching, cmdLines)
@@ -196,29 +196,29 @@ func (m *MultiDB) flushAll() redis.Reply {
 	if m.aofHandler != nil {
 		m.aofHandler.AddAof(0, utils.ToCmdLine("FlushAll"))
 	}
-	return &reply.OkReply{}
+	return &protocol.OkReply{}
 }
 
 func execSelect(c redis.Connection, mdb *MultiDB, args [][]byte) redis.Reply {
 	dbIndex, err := strconv.Atoi(string(args[0]))
 	if err != nil {
-		return reply.MakeErrReply("ERR invalid DB index")
+		return protocol.MakeErrReply("ERR invalid DB index")
 	}
 	if dbIndex >= len(mdb.dbSet) {
-		return reply.MakeErrReply("ERR DB index is out of range")
+		return protocol.MakeErrReply("ERR DB index is out of range")
 	}
 	c.SelectDB(dbIndex)
-	return reply.MakeOkReply()
+	return protocol.MakeOkReply()
 }
 
 // BGRewriteAOF asynchronously rewrites Append-Only-File
 func BGRewriteAOF(db *MultiDB, args [][]byte) redis.Reply {
 	go db.aofHandler.Rewrite()
-	return reply.MakeStatusReply("Background append only file rewriting started")
+	return protocol.MakeStatusReply("Background append only file rewriting started")
 }
 
 // RewriteAOF start Append-Only-File rewriting and blocked until it finished
 func RewriteAOF(db *MultiDB, args [][]byte) redis.Reply {
 	db.aofHandler.Rewrite()
-	return reply.MakeStatusReply("Background append only file rewriting started")
+	return protocol.MakeStatusReply("Background append only file rewriting started")
 }

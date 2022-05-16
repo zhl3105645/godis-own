@@ -8,7 +8,7 @@ import (
 	"godis/lib/utils"
 	"godis/redis/connection"
 	"godis/redis/parser"
-	"godis/redis/reply"
+	"godis/redis/protocol"
 	"io"
 	"os"
 	"strconv"
@@ -77,7 +77,7 @@ func (h *Handler) handleAof() {
 		h.pausingAof.RLock()
 		if p.dbIndex != h.currentDB {
 			// select db
-			data := reply.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(p.dbIndex))).ToBytes()
+			data := protocol.MakeMultiBulkReply(utils.ToCmdLine(constant.Select, strconv.Itoa(p.dbIndex))).ToBytes()
 			_, err := h.aofFile.Write(data)
 			if err != nil {
 				logger.Warn(err)
@@ -85,7 +85,7 @@ func (h *Handler) handleAof() {
 			}
 			h.currentDB = p.dbIndex
 		}
-		data := reply.MakeMultiBulkReply(p.cmdLine).ToBytes()
+		data := protocol.MakeMultiBulkReply(p.cmdLine).ToBytes()
 		_, err := h.aofFile.Write(data)
 		if err != nil {
 			logger.Warn(err)
@@ -136,13 +136,13 @@ func (h *Handler) LoadAof(maxBytes int) {
 			logger.Error("empty payload")
 			continue
 		}
-		r, ok := p.Data.(*reply.MultiBulkReply)
+		r, ok := p.Data.(*protocol.MultiBulkReply)
 		if !ok {
-			logger.Error("require multi bulk reply")
+			logger.Error("require multi bulk protocol")
 			continue
 		}
 		ret := h.db.Exec(fakeConn, r.Args)
-		if reply.IsErrorReply(ret) {
+		if protocol.IsErrorReply(ret) {
 			logger.Error("exec err", err)
 		}
 	}
