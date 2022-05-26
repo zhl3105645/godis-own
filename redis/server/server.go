@@ -7,6 +7,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"godis/cluster"
 	"godis/config"
 	database2 "godis/database"
 	"godis/interface/database"
@@ -36,7 +37,7 @@ type Handler struct {
 func MakeHandler() *Handler {
 	var db database.DB
 	if config.Properties.Self != "" && len(config.Properties.Peers) > 0 {
-		//TODO 集群
+		db = cluster.MakeCluster()
 	} else {
 		logger.Info("multiDB created successfully")
 		db = database2.NewStandaloneServer()
